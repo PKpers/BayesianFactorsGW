@@ -1,0 +1,371 @@
+import numpy as np
+import random as rand
+import matplotlib.pyplot as plt
+from scipy.integrate import dblquad, tplquad, quad
+
+#############
+# Functions #
+#############
+
+def sample(n_points, x_range, dist):
+    '''
+    samples from the values of a given distribution
+    over a given range. Using rejection sampling
+
+    Arguments:
+    - n_points:   integer,
+                  number of points to be sampled
+
+    - x_range:    array_like(1d),
+                  the domain of the distribution
+
+    - dist:       array_like(1d)
+                  the values of the distribution
+
+    Returns:
+    - sampled_x:  list(1d),
+                  the sampled points
+    '''
+    sampled = list()
+    while len(sampled) != n_points:
+        x = rand.uniform(x_range[0], x_range[-1])
+        y = rand.uniform(0, max(dist))
+        fx = np.interp(x, x_range, dist) #estimate f(x) via interpolation
+        if y<fx:
+            sampled.append(x)
+        #
+    #
+    return sampled
+    
+
+def likelihood_gaussian(a, b, times, datas, sigma_noise):
+
+    num      = (datas - model_lin(times, a, b))**2
+    gaussian = 1./np.sqrt(2.*np.pi*sigma_noise**2) * np.exp((-1./2.) * np.sum(num)/(sigma_noise)**2 )
+
+    return gaussian
+
+def likelihood_gaussian_quad(a, b, c, times, datas, sigma_noise):
+
+    num      = (datas - model_quad(times, a, b, c))**2
+    gaussian = 1./np.sqrt(2.*np.pi*sigma_noise**2) * np.exp((-1./2.) * np.sum(num)/(sigma_noise)**2 )
+
+    return gaussian
+
+def model_lin(x,a,b):
+
+    return a + x * b
+
+def model_quad(x,a,b,c):
+
+    return a*x*x + b*x + c
+
+###############
+# User inputs #
+###############
+
+show_data    = 1
+zero_noise   = 0
+
+N_data       = 100
+a_inj, b_inj = 0.5, 1.1
+t_min, t_max = 0.0, 1.0
+sigma        = 0.2
+
+fig_path = '/home/kpapad/puk/examples/param_estiamtion/figures/'
+###############
+# Create data #
+###############
+
+np.random.seed(1)
+time      = np.linspace(t_min,t_max,N_data)
+model_inj = model_lin(time, a_inj, b_inj)
+data      = model_inj
+if not(zero_noise): data += np.random.normal(0, sigma, size=N_data)
+
+fake_data = open('Fake_data.txt', 'w')
+fake_data.write('#Time \t\tData\n')
+for i in range(0, N_data):
+    fake_data.write('%f\t%f\n' %(time[i], data[i]))
+fake_data.close()
+
+if(show_data):
+    fig_dat, ax_dat = plt.subplots()
+    ax_dat.scatter(time, data,   c='firebrick', alpha=0.9, label='Data')
+    #ax_dat.plot(time, model_inj, c='black', linestyle='-', label='Injection')
+    ax_dat.legend(loc='best')
+    ax_dat.set_title('Gaussian noisy linear data')
+    ax_dat.set_xlabel('$Time [s]  $')
+    ax_dat.set_ylabel('$Data [AU] $')
+
+##############################
+# Calculate linear posterior #
+##############################
+
+a_min    = 0.0
+a_max    = 1.0
+b_min    = 0.5
+b_max    = 1.5
+n_points = 500
+
+a_vec = np.linspace(a_min, a_max, n_points)
+b_vec = np.linspace(b_min, b_max, n_points)
+X,Y   = np.meshgrid(a_vec, b_vec) # grid of points
+
+prior_l     = (1./(a_max-a_min)) * (1./(b_max-b_min)) # we assume uniforms posteriors
+
+'''
+# Rejection method takes more than 10 minutes just from 50 points
+max_post_l = np.sqrt(2*np.pi*sigma**2)*prior_l
+sampled = list()
+while len(sampled) != n_points:
+    x = rand.uniform(a_vec[0], a_vec[-1])
+    y = rand.uniform(b_vec[0], b_vec[-1])
+    z = rand.uniform(0, max_post_l)
+    f = posterior_l(x, y) 
+    point = (x, y, f)# a, b, f(a,b)
+    if z<f:
+        sampled.append(point)
+    #
+#
+sampled_a = [s[0] for s in sampled] # a sampled from f(a,b)
+sampled_b = [s[1] for s in sampled] # b sampled from f(a, b)
+eval_post_lin = [s[2] for s in sampled] # the value of f in the sampled (a,b)
+print(eval_post_lin.shape)
+exit()
+
+'''
+posterior_l = [[0 for i in range(len(a_vec))] for j in range(len(b_vec))]
+
+for i in range(len(a_vec)):
+    for j in range(len(b_vec)):
+        posterior_l[j][i] = \
+            prior_l * likelihood_gaussian(a_vec[i], b_vec[j], time, data, sigma)
+
+#
+
+evidence_l = np.trapz(np.trapz(posterior_l, b_vec, axis=0), a_vec, axis=0)
+posterior_l = posterior_l/evidence_l
+
+post_marginal_a = np.trapz(posterior_l, b_vec, axis=0)
+post_marginal_b = np.trapz(posterior_l, a_vec, axis=1)
+
+samp_a = sample(n_points, a_vec, post_marginal_a)
+samp_b = sample(n_points, b_vec, post_marginal_b)
+
+# Find the best estimate for the parameters
+a_est = np.median(samp_a)
+a_lower= a_est - np.percentile(samp_a,5)
+a_upper= np.percentile(samp_a,95) - a_est
+
+b_est = np.median(samp_b)
+b_lower = b_est - np.percentile(samp_b,5)
+b_upper= np.percentile(samp_b,95) - b_est
+
+# Having sampled a and b from their posteriors, one can consider the model as a
+# random variable depending on a and b(also random variables).
+# Lets plot the distribution m(a, b) = a + b*x
+'''
+linear_dist = [[0 for i in range(len(samp_a))] for j in range(len(samp_b))]
+
+for i in range(len(samp_a)):
+    for j in range(len(samp_b)):
+        linear_dist[j][i] = \
+            model_lin(time, samp_a[i], samp_b[j])
+
+'''
+# plot the posterior
+plt.figure()
+plt.scatter(X,Y, c=posterior_l, s=100, marker='*', cmap='viridis')
+plt.plot(a_inj, b_inj, marker='+', markersize=12, c='black', label='real values')
+plt.plot(a_est, b_est, marker='+', markersize=12, c='firebrick',label='estimated values')
+plt.xlabel('a')
+plt.ylabel('b')
+plt.title('$\mathrm{p(a,b | D, H, I)}$')
+plt.legend(loc='best')
+plt.savefig(fig_path+'linear_posterior1.png')
+#plt.show()
+
+fig_l = plt.figure(figsize=(15, 10))
+ax_l = fig_l.subplots(1, 2)
+
+ax_l[0].plot(a_vec, post_marginal_a)
+ax_l[0].scatter(a_est, np.interp(a_est, a_vec, post_marginal_a),
+                label = 'best a = {} + {} - {}'
+                .format(round(a_est,2),round(a_upper,2), round(a_lower,2)),
+                c='firebrick',
+                marker = '+'
+)
+ax_l[0].axvline(a_inj, color='green', linestyle='--', label='real best estimate')
+ax_l[0].set_xlabel('a')
+ax_l[0].set_ylabel(r'$P(a|H2,D,I) = \int\int db dc P(a,b,c|H2,D,I)$')
+ax_l[0].legend()
+
+ax_l[1].plot(b_vec, post_marginal_b)
+ax_l[1].plot(b_est, np.interp(b_est, b_vec, post_marginal_b),
+             label = 'best b={} + {} - {}'
+             .format(round(b_est,2), round(b_upper,2), round(b_lower,2)),
+             c='firebrick',
+             marker="+"
+)
+ax_l[1].axvline(b_inj, color='green', linestyle='--', label='real best estimate')
+ax_l[1].set_xlabel('b')
+ax_l[1].set_ylabel(r'$P(b|H2,D,I) = \int\int da dc P(a,b,c|H2,D,I)$')
+ax_l[1].legend()
+
+fig_l.savefig(fig_path+'linear_posterior_marginals1.png')
+#a_est = a_vec[post_marginal_a.argmax()]
+#b_est = b_vec[post_marginal_b.argmax()]
+
+ax_dat.plot(time, model_lin(time, a_est, b_est), 'b--',
+            label='linear model'
+            
+)
+
+ax_dat.legend(loc='best')
+
+#################################
+# Calculate quadratic posterior #
+#################################
+
+a_min    = -0.5
+a_max    = 0.5
+b_min    = 0.5
+b_max    = 2
+c_min    = 0.0
+c_max    = 1.0
+n_points = 50
+
+a_vec = np.linspace(a_min, a_max, n_points)
+b_vec = np.linspace(b_min, b_max, n_points)
+c_vec = np.linspace(c_min, c_max, n_points)
+
+prior_q     = (1./(a_max-a_min)) * (1./(b_max-b_min)) * (1./(c_max-c_min))
+posterior_q = [
+    [ [0 for i in range(len(a_vec))] for j in range(len(b_vec)) ]
+    for k in range(len(c_vec))
+]#create a list of dimension: len(a) * len(b) * len(c)
+
+for i in range(len(a_vec)):
+    for j in range(len(b_vec)):
+        for k in range(len(c_vec)):
+            posterior_q[j][i][k] =\
+                prior_q*likelihood_gaussian_quad(
+                    a_vec[i], b_vec[j], c_vec[k], time, data, sigma
+                )
+            #
+        #
+    #
+#
+
+# Compute the evidence as the triple integral over a, b and c
+evidence_q = np.trapz(
+    np.trapz(
+        np.trapz(posterior_q, a_vec, axis=1),
+        b_vec,
+        axis= 0
+    ),
+    c_vec,
+    axis=0
+)
+
+posterior_q = posterior_q/evidence_q
+
+# Mrginalize the posterior
+post_marginal_a = np.trapz(
+    np.trapz(posterior_q, b_vec, axis=0), c_vec, axis=1
+)
+
+post_marginal_b = np.trapz(
+    np.trapz(posterior_q, a_vec, axis=1), c_vec, axis=1
+)
+post_marginal_c = np.trapz(
+    np.trapz(posterior_q, b_vec, axis=0), a_vec, axis=0
+)
+
+
+samp_a = sample(n_points, a_vec, post_marginal_a)
+samp_b = sample(n_points, b_vec, post_marginal_b)
+samp_c = sample(n_points, c_vec, post_marginal_c)
+
+# Find the best estimate for the parameters
+a_est = np.median(samp_a)
+a_lower= a_est - np.percentile(samp_a,5)
+a_upper= np.percentile(samp_a,95) - a_est
+
+b_est = np.median(samp_b)
+b_lower = b_est - np.percentile(samp_b,5)
+b_upper= np.percentile(samp_b,95) - b_est
+
+c_est = np.median(samp_c)
+c_lower = c_est - np.percentile(samp_c,5)
+c_upper= np.percentile(samp_c,95) - c_est
+
+
+# plot the marginalized posteriors for the quadtratic case
+fig1 = plt.figure(figsize=(15, 10))
+ax1 = fig1.subplots(1, 3)
+
+ax1[0].plot(a_vec, post_marginal_a)
+ax1[0].plot(a_est, np.interp(a_est, a_vec, post_marginal_a),
+            label = 'best a = {} + {} - {}'
+            .format(round(a_est,2),round(a_upper,2), round(a_lower,2)),
+            c='firebrick', marker = "+"
+)
+ax1[0].axvline(0, color='green', linestyle='--', label='real best estimate')
+ax1[0].set_xlabel('a')
+ax1[0].set_ylabel(r'$P(a|H2,D,I) = \int\int db dc P(a,b,c|H2,D,I)$')
+ax1[0].legend()
+
+ax1[1].plot(b_vec, post_marginal_b)
+ax1[1].plot(b_est, np.interp(b_est, b_vec, post_marginal_b),
+            label = 'best b = {} + {} - {}'
+            .format(round(b_est,2),round(b_upper,2), round(b_lower,2)),
+            c='firebrick', marker = "+"
+)
+ax1[1].axvline(b_inj, color='green', linestyle='--', label='real best estimate')
+ax1[1].set_xlabel('b')
+ax1[1].set_ylabel(r'$P(b|H2,D,I) = \int\int da dc P(a,b,c|H2,D,I)$')
+ax1[1].legend()
+
+ax1[2].plot(c_vec, post_marginal_c)
+ax1[2].plot(c_est, np.interp(c_est, c_vec, post_marginal_c),
+            label = 'best c = {} + {} - {}'
+            .format(round(c_est,2),round(c_upper,2), round(c_lower,2)),
+            c='firebrick', marker = "+"
+)
+ax1[2].axvline(a_inj, color='green', linestyle='--', label='real best estimate')
+ax1[2].set_xlabel('c')
+ax1[2].set_ylabel(r'$P(c|H2,D,I) = \int\int da db P(a,b|H2,D,I)$')
+ax1[2].legend()
+fig1.savefig(fig_path+'quad_posteriors_marginalized1.png')
+
+# Calculate the posterior odds for the linear vs quadratic model
+post_odds = evidence_l/evidence_q
+ax_dat.text(0.6, 0.55, r'linear/quadratic = {}'.format(round(post_odds,2)))
+# plot the best estimated parameters
+ax_dat.plot(time, model_quad(time, a_est, b_est, c_est), 'g--',
+            label='quadratic model'
+            )
+
+ax_dat.legend(loc='best')
+fig_dat.savefig(fig_path+'fit1.png')
+plt.show()
+
+exit()
+
+'''
+ax_dat.fill_between(time,
+                    model_quad(time, a_lower, b_lower, c_lower),
+                    model_quad(time, a_upper, b_upper, c_upper),
+                    color = 'green',
+                    alpha = 0.2,
+                    label = 'quadratic: 90% CI'
+)
+ax_dat.fill_between(time,
+                    model_lin(time, a_lower, b_lower),
+                    model_lin(time, a_upper, b_upper),
+                    alpha = 0.2,
+                    label = 'linear: 90% CI'
+)
+'''

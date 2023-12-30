@@ -1,0 +1,7 @@
+from matplotlib import pyplot as plt
+import numpy as np
+
+def P(x, f, N):
+    numerator = f*x**N
+    denominator = f*(x**N) + (1-f)*(1-x)**N
+    return numerator/denominator 

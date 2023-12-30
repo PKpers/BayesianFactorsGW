@@ -2,3 +2,4 @@
 *.org*
 my_env/*
 .tok
+.tok~

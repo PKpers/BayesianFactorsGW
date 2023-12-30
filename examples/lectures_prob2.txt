@@ -1,0 +1,104 @@
+import numpy as np
+from matplotlib import pyplot as plt
+from scipy.integrate import dblquad, tplquad
+from scipy.optimize import minimize 
+
+sig = 0.5 # we assume the error in our measurements 
+
+## define the models and the likelihoods we calculated
+def linear(x, a, b):
+    return a*x+b
+#
+
+def quadratic(x, a, b, c):
+    return a*np.power(x,2)+b*x+c
+#
+
+def likelihood_linear(y, a, b, x, sig_ = sig):
+    exponent = np.power( (y - linear(x, a, b)), 2)
+    return np.exp(-0.5*np.sum(exponent)/np.power(sig_,2))
+#
+
+def likelihood_quad(y, a, b, c, x, sig_=sig):
+    exponent = np.power((y - quadratic(x, a, b, c)),2)
+    return np.exp(-0.5*np.sum(exponent)/np.power(sig_,2))
+#
+
+## create the data set
+y = np.array([
+    0.62165013, 1.02361924, 1.51161683, 0.78429014, 0.76852557,
+    1.3840013, 2.98271159, 2.62484856, 2.51702153
+])
+x = np.linspace(0,1,9)
+
+## To perform the integration, define first the limits of the parameter a, b and c
+amin = -10.0
+amax = 10.0
+bmin = -10.0
+bmax = 10.0
+cmin = -10.0
+cmax = 10.0
+
+# evaluate the likelihoods on the measured x and y, but let them
+# still remain callable on the parameters a, b and c
+ll = lambda a, b: likelihood_linear(y, a, b, x)  
+lq = lambda a, b, c: likelihood_quad(y, a, b, c, x)
+
+marginal_lin = dblquad(ll, amin, amax, bmin, bmax)
+marginal_quad = tplquad(lq, amin, amax, bmin, bmax, cmin, cmax)
+
+print('the prior odds are: ', marginal_lin[0]/marginal_quad[0])
+
+## Time to plot the posterior p(a,b|H1,D,I)
+denom_lin = marginal_lin[0]
+print(denom_lin)
+#Create a grid of a and b values
+a_values = np.linspace(amin, amax, 100)
+b_values = np.linspace(bmin, bmax, 100)
+
+# Create a meshgrid from a and b values
+A, B = np.meshgrid(a_values, b_values)
+
+# Calculate likelihood values for each combination of a and b
+likelihood_values = np.zeros_like(A)
+for i in range(A.shape[0]):
+    for j in range(A.shape[1]):
+        likelihood_values[i, j] = likelihood_linear(y, A[i, j], B[i, j], x, sig)
+    #
+#
+posterior_values = likelihood_values /denom_lin
+# Create the heatmap
+plt.figure(figsize=(10, 8))
+plt.contourf(a_values, b_values, posterior_values, cmap='viridis', levels=100)
+plt.colorbar(label='P(a,b|H1,D,I)')
+plt.xlabel('a')
+plt.ylabel('b')
+plt.show()
+
+# Find the best a and b for the linear case 
+# To do so I will minimize the negative log of the posterior
+def neg_log_post(params, y, x, sig_):
+    a, b = params
+    return -np.log(likelihood_linear(y, a, b, x, sig_))/denom_lin
+
+# Initial guess for parameters
+initial_guess = [0, 0]
+
+# Perform optimization
+result = minimize(neg_log_post, initial_guess, args=(y, x, sig))
+
+# Extract optimized parameters
+a_opt, b_opt = result.x
+
+# Print the results
+print("Estimated Parameters: a = {}, b = {}".format(a_opt, b_opt))
+
+plt.plot(x, y, 'o', label='measurements')
+plt.plot(x, linear(a_opt, b_opt, x), 'r--',
+         label = 'best estimates\n a={}, b={}'
+         .format(round(a_opt,2), round(b_opt, 2))
+)
+plt.xlabel('x data')
+plt.ylabel('y data')
+plt.legend()
+plt.show()
