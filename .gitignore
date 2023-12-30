@@ -1,0 +1,4 @@
+*.org
+*.org*
+my_env/*
+.tok
