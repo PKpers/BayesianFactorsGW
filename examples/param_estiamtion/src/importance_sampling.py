@@ -44,17 +44,26 @@ while len(sampled) != 100000:
 #
 sampled_x = np.array(sampled_x)
 weights_ = f(sampled_x)/g(sampled_x) # calculate the weights f(x)/g(x)
+weights_norm = weights_/np.sum(weights_)
+sampled_indices = np.random.choice(len(sampled_x), size=len(sampled_x), p=weights_norm)
+sampled_f = sampled_x[sampled_indices]
+
+plt.hist(sampled_f, density=True, label = 'samples from f using g')
+
+
 # According to importance sampling this should approximate the integral of f
-print(np.mean(weights_)) 
+#print(np.mean(weights_)) 
 
 integral = Int.quad(f, -pi/2, pi/2)
 print(integral) #The actual value of the integal \int{f(x)}
 
+'''
 counts, bins, weights = plt.hist(sampled_x, 
                                  weights = weights_, 
                                  density=True, 
-                                 label = 'histogram of sampled x'
+                                 
 )
+'''
 
 plt.scatter(sampled_x, weights_*g(sampled_x), 
             color='red', marker='.', 

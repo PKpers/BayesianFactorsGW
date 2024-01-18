@@ -58,7 +58,7 @@ def model_lin(x,a,b):
 
 def model_quad(x,a,b,c):
 
-    return a*x*x + b*x + c
+    return a + b*x +c*x*x
 
 ###############
 # User inputs #
@@ -70,14 +70,15 @@ zero_noise   = 0
 N_data       = 100
 a_inj, b_inj = 0.5, 1.1
 t_min, t_max = 0.0, 1.0
-sigma        = 0.2
+sigma        = 0.2 #0.05, 0.1, 0.2, 0.6, 1
 
-fig_path = '/home/kpapad/puk/examples/param_estiamtion/figures/MC'
+fig_path = '/home/kpapad/puk/examples/param_estiamtion/figures/MC_s02_'
 ###############
 # Create data #
 ###############
 
 fig_dat, ax_dat = plt.subplots()
+#figsize=(15, 10)
 
 np.random.seed(1)
 time      = np.linspace(t_min,t_max,N_data)
@@ -106,11 +107,11 @@ if(show_data):
 # Calculate linear posterior #
 ##############################
 
-a_min    = 0.0
-a_max    = 1.0
-b_min    = 0.5
-b_max    = 2.0
-n_points = 10000
+a_min    = -2.
+a_max    = 2
+b_min    = -2.5
+b_max    = 8.
+n_points = 100000
 
 a_vec = np.linspace(a_min, a_max, n_points)
 b_vec = np.linspace(b_min, b_max, n_points)
@@ -133,7 +134,7 @@ while len(sampled_a) != n_points:
     if u<=T:
         sampled_a.append(ai)
         sampled_b.append(bi)
-        a_lst, b_last = ai, bi
+        a_last, b_last = ai, bi
     #
 #
 plt.figure()
@@ -143,22 +144,6 @@ counts, a_bins, b_bins, _ = plt.hist2d(sampled_a, sampled_b)
 # The a dimension is along the y-axis of the array 
 marginalized_b = list()
 marginalized_b = [ np.trapz(count, a_bins[:-1]) for count in counts.T ]
-'''
-for count in counts.T:
-    int_a = np.trapz(count, a_bins[:-1]) #integrate hist over a
-    marginalized_b.append(int_a)
-'''
-#
-# integrate over b to get the marginalized posterior on a
-# The b dimension is along the x-axis of the array 
-marginalized_a = list()
-marginalized_a = [ np.trapz(count, b_bins[:-1]) for count in counts ]
-'''
-for count in counts:
-    int_b = np.trapz(count, b_bins[:-1])
-    marginalized_a.append(int_b)
-#
-'''
 
 evidence_l = np.trapz(marginalized_b, b_bins[:-1])
 
@@ -218,12 +203,12 @@ plt.xlabel('a')
 plt.ylabel('b')
 plt.title('$\mathrm{p(a,b | D, H, I)}$')
 plt.legend(loc='best')
-plt.savefig(fig_path+'linear_posterior1.png')
+plt.savefig(fig_path+'linear_posterior1.pdf')
 
 fig_l = plt.figure(figsize=(15, 10))
 ax_l = fig_l.subplots(1, 2)
 
-ax_l[0].plot(a_vec, np.interp(a_vec, a_bins[:-1], marginalized_a))
+ax_l[0].hist(sampled_a)
 ax_l[0].axvline(a_est, color = "red", label='best estimate: {}'.format(round(a_est,2)))
 ax_l[0].axvline(a_est - a_lower , color = "blue", label = '5%')
 ax_l[0].axvline(a_est + a_upper , color = "blue", label = '95%')
@@ -232,7 +217,7 @@ ax_l[0].set_xlabel('a')
 ax_l[0].set_ylabel(r'$P(a|H1,D,I) = \int db P(a,b|H1,D,I)$')
 ax_l[0].legend()
 
-ax_l[1].plot(b_vec, np.interp(b_vec, b_bins[:-1], marginalized_b))
+ax_l[1].hist(sampled_b)
 ax_l[1].axvline(b_est, color = "red", label='best estimate {}'.format(round(b_est,2)))
 ax_l[1].axvline(b_est - b_lower , color = "blue", label = '5%')
 ax_l[1].axvline(b_est + b_upper , color = "blue", label = '95%')
@@ -242,7 +227,7 @@ ax_l[1].set_xlabel('b')
 ax_l[1].set_ylabel(r'$P(b|H2,D,I) = \int da  P(a,b|H1,D,I)$')
 ax_l[1].legend()
 
-fig_l.savefig(fig_path+'linear_posterior_marginals1.png')
+fig_l.savefig(fig_path+'linear_posterior_marginals1.pdf')
 #a_est = a_vec[post_marginal_a.argmax()]
 #b_est = b_vec[post_marginal_b.argmax()]
 
@@ -253,16 +238,10 @@ ax_dat.legend(loc='best')
 # Calculate quadratic posterior #
 #################################
 
-a_min    = -0.5
-a_max    = 0.5
-b_min    = -0.5
-b_max    = 2.5
-c_min    = -0.5
-c_max    = 1.0
-n_points = 10000
+c_min    = -6.5
+c_max    = 4.5
+n_points = 100000
 
-a_vec = np.linspace(a_min, a_max, n_points)
-b_vec = np.linspace(b_min, b_max, n_points)
 c_vec = np.linspace(c_min, c_max, n_points)
 
 prior_q     = (1./(a_max-a_min)) * (1./(b_max-b_min)) * (1./(c_max-c_min))
@@ -270,7 +249,7 @@ posterior_q = lambda a, b, c: prior_q*likelihood_gaussian_quad(a, b, c, time, da
 
 ## Metropolis algorithm. The proposal distribution is uniform in a and b 
 sampled_a, sampled_b, sampled_c = list(), list(), list()
-a0, b0, c0 = 0, b_inj, a_inj
+a0, b0, c0 = a_inj, b_inj, 0 
 a_last, b_last, c_last = a0, b0, c0
 while len(sampled_a) != n_points:
     ai = rand.uniform(a_vec[0], a_vec[-1])
@@ -283,7 +262,7 @@ while len(sampled_a) != n_points:
         sampled_a.append(ai)
         sampled_b.append(bi)
         sampled_c.append(ci)
-        a_lst, b_last, c_last = ai, bi, ci
+        a_last, b_last, c_last = ai, bi, ci
     #
 #
 
@@ -298,19 +277,19 @@ marginal_ab = list()
 marginal_a  = list()
 for count in counts:
     int_abc_b = [ np.trapz(co, b_bins[:-1]) for co in count.T ] # integrate P(a,b,c) over b to get P(a, c)
-    int_abc_c = [ np.trapz(co, c_bins[:-1]) for co in count   ] # integrate P(a,b,c) over c to get P(a, b)
-    int_ac_c  = np.trapz(int_abc_b, c_bins[:-1])                # integrate P(a, c) over c to get P(a)
+    #int_abc_c = [ np.trapz(co, c_bins[:-1]) for co in count   ] # integrate P(a,b,c) over c to get P(a, b)
+    #int_ac_c  = np.trapz(int_abc_b, c_bins[:-1])                # integrate P(a, c) over c to get P(a)
 
     marginal_ac.append(int_abc_b) # P(a,c)
-    marginal_ab.append(int_abc_c) # P(a,b)
-    marginal_a.append(int_ac_c)   # P(a)
+    #marginal_ab.append(int_abc_c) # P(a,b)
+    #marginal_a.append(int_ac_c)   # P(a)
 #
 
 marginal_ac = np.array(marginal_ac)
-marginal_ab = np.array(marginal_ab)
+#marginal_ab = np.array(marginal_ab)
 
-marginal_a = np.array(marginal_a)
-marginal_b = np.trapz(marginal_ab, a_bins[:-1], axis=0)
+#marginal_a = np.array(marginal_a)
+#marginal_b = np.trapz(marginal_ab, a_bins[:-1], axis=0)
 marginal_c = np.trapz(marginal_ac, a_bins[:-1], axis=0)
 
 
@@ -318,7 +297,8 @@ evidence_q = np.trapz(marginal_c, c_bins[:-1])
 
 # Calculate the posterior odds for the linear vs quadratic model
 post_odds = evidence_l/evidence_q
-ax_dat.text(0.6, 0.55, r'linear/quadratic = {}'.format(round(post_odds,2)))
+#ax_dat.text(0.6, 0.55, r'linear/quadratic = {}'.format(round(post_odds,2)))
+
 
 
 # Find the best estimate for the parameters
@@ -331,7 +311,7 @@ b_lower = b_est - np.percentile(sampled_b,5)
 b_upper= np.percentile(sampled_b,95) - b_est
 
 c_est = np.median(sampled_c)
-c_lower = b_est - np.percentile(sampled_c,5)
+c_lower = c_est - np.percentile(sampled_c,5)
 c_upper= np.percentile(sampled_c,95) - c_est
 
 #counts = counts / evidence 
@@ -374,19 +354,19 @@ ax_dat.fill_between(time, lower_bounds, upper_bounds,
 
 
 # plot the marginalized posteriors for the quadtratic case
-fig1 = plt.figure(figsize=(15, 10))
+fig1 = plt.figure(figsize=(18, 10))
 ax1 = fig1.subplots(1, 3)
 
-ax1[0].plot(a_vec, np.interp(a_vec, a_bins[:-1], marginal_a))
+ax1[0].hist(sampled_a)
 ax1[0].axvline(a_est, color = "red", label='best estimate: {}'.format(round(a_est,2)))
 ax1[0].axvline(a_est - a_lower , color = "blue", label = '5%')
 ax1[0].axvline(a_est + a_upper , color = "blue", label = '95%')
-ax1[0].axvline(0, color='green', linestyle='--', label='real value')
+ax1[0].axvline(a_inj, color='green', linestyle='--', label='real value')
 ax1[0].set_xlabel('a')
 ax1[0].set_ylabel(r'$P(a|H2,D,I) = \int\int db dc P(a,b,c|H2,D,I)$')
 ax1[0].legend()
 
-ax1[1].plot(b_vec, np.interp(b_vec, b_bins[:-1], marginal_b))
+ax1[1].hist(sampled_b)
 ax1[1].axvline(b_est, color = "red", label='best estimate: {}'.format(round(b_est,2)))
 ax1[1].axvline(b_est - b_lower , color = "blue", label = '5%')
 ax1[1].axvline(b_est + b_upper , color = "blue", label = '95%')
@@ -396,36 +376,20 @@ ax1[1].set_xlabel('b')
 ax1[1].set_ylabel(r'$P(b|H2,D,I) = \int\int da dc P(a,b,c|H2,D,I)$')
 ax1[1].legend()
 
-ax1[2].plot(c_vec, np.interp(c_vec, c_bins[:-1], marginal_c))
+ax1[2].hist(sampled_c)
 ax1[2].axvline(c_est, color = "red", label='best estimate: {}'.format(round(c_est,2)))
 ax1[2].axvline(c_est - c_lower , color = "blue", label = '5%')
 ax1[2].axvline(c_est + c_upper , color = "blue", label = '95%')
 
-ax1[2].axvline(a_inj, color='green', linestyle='--', label='real best estimate')
+ax1[2].axvline(0, color='green', linestyle='--', label='real best estimate')
 ax1[2].set_xlabel('c')
 ax1[2].set_ylabel(r'$P(c|H2,D,I) = \int\int da db P(a,b|H2,D,I)$')
 ax1[2].legend()
-fig1.savefig(fig_path+'quad_posteriors_marginalized1.png')
+fig1.savefig(fig_path+'quad_posteriors_marginalized1.pdf')
 
 
 
-ax_dat.legend(loc='best')
-fig_dat.savefig(fig_path+'fit1.png')
+ax_dat.legend(title = r'linear/quadratic = {}'.format(round(post_odds,2)),loc='best')
+fig_dat.savefig(fig_path+'fit1.pdf')
 
 exit()
-
-'''
-ax_dat.fill_between(time,
-                    model_quad(time, a_lower, b_lower, c_lower),
-                    model_quad(time, a_upper, b_upper, c_upper),
-                    color = 'green',
-                    alpha = 0.2,
-                    label = 'quadratic: 90% CI'
-)
-ax_dat.fill_between(time,
-                    model_lin(time, a_lower, b_lower),
-                    model_lin(time, a_upper, b_upper),
-                    alpha = 0.2,
-                    label = 'linear: 90% CI'
-)
-'''

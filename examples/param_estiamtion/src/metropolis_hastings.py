@@ -36,6 +36,7 @@ while len(sampled) != 10000:
         x_last = xi
     #
 #
+integral = np.mean(sampled)*abs(x_eval[0] - x_eval[-1])
 plt.hist(sampled, density=True, label = 'metropolis-hastings samples')
 plt.legend(loc='best')
 plt.show()
