@@ -71,11 +71,12 @@ def sample_snr(n_data):
     
 
 sampled_SNR = np.array( [  sample_snr(n_data) for times in range(3) ] ) # Generate SNRs for the 3 datasets
-
-plt.hist(sampled_SNR[0])
-plt.hist(sampled_SNR[1])
-plt.hist(sampled_SNR[2])
-
+plt.title('Sampled SNR')
+plt.hist(sampled_SNR[0],alpha=0.5, label='SNR0')
+plt.hist(sampled_SNR[1],alpha=0.5, label='SNR1')
+plt.hist(sampled_SNR[2],alpha=0.5, label='SNR2')
+plt.xlabel('SNR')
+plt.legend(loc='best')
 
 # SNR proportionality constants 
 prop_0 = np.array( [24*0.06 for num in range(n_data)] )
@@ -85,11 +86,14 @@ prop_2 = np.array( [24*0.2  for num in range(n_data)] )
 measurement_error_0 = (1/sampled_SNR[0])*prop_0
 measurement_error_1 = (1/sampled_SNR[1])*prop_1
 measurement_error_2 = (1/sampled_SNR[2])*prop_2
+
 plt.figure()
-plt.title('sigmas')
-plt.hist(measurement_error_0)
-plt.hist(measurement_error_1)
-plt.hist(measurement_error_2)
+plt.title(r'Sampled $\sigma$')
+plt.hist(measurement_error_0,alpha=0.5, label=r'$\mu$0')
+plt.hist(measurement_error_1,alpha=0.5, label=r'$\mu$1')
+plt.hist(measurement_error_2,alpha=0.5, label=r'$\mu$2')
+plt.xlabel(r'$\mu$')
+plt.legend(loc='best')
 
 deltaPhi_0 = np.array(
     [rand.normal(0, abs(measurement_error_0[i])) for i in range(n_data)]
@@ -103,11 +107,13 @@ deltaPhi_2 = np.array(
 )
 
 plt.figure()
-plt.title('mus')
-plt.hist(deltaPhi_0)
-plt.hist(deltaPhi_1)
-plt.hist(deltaPhi_2)
+plt.title(r'Sampled $\mu$')
+plt.hist(deltaPhi_0,alpha=0.5, label=r'$\sigma$0')
+plt.hist(deltaPhi_1,alpha=0.5, label=r'$\sigma$1')
+plt.hist(deltaPhi_2,alpha=0.5, label=r'$\sigma$2')
+plt.xlabel(r'$\sigma$')
 
+plt.legend(loc='best')
 plt.show()
 
 def integral(mu_j, sigma_j, measured_param, measurement_error, n_data, prior_mu, prior_s):
@@ -148,7 +154,7 @@ def sample_posterior(n_points, mu_init, s_init, delta_phi, measurement_error, pr
     mu_acc, s_acc = mu_init, s_init
     for i in range(1000):
         mu_new= rand.normal(mu_acc, 1)
-        s_new= rand.normal(s_acc, 5)
+        s_new= rand.normal(s_acc, 0.01)
         p = integral(mu_new,s_new, delta_phi, measurement_error, num_data, prior_mu, prior_s)\
             /integral(mu_acc, s_acc, delta_phi, measurement_error, num_data, prior_mu, prior_s) 
         #
@@ -164,7 +170,7 @@ def sample_posterior(n_points, mu_init, s_init, delta_phi, measurement_error, pr
     return (hyper_mus, hyper_sigmas) 
     #
 #
-n_points = 1000
+n_points = 5000
 mu0_init, sigma0_init = 0, 1
 
 hyper_mus_0, hyper_sigmas_0 = sample_posterior(n_points, mu0_init, sigma0_init, deltaPhi_0, measurement_error_0, prior_mu_0, prior_s_0)
@@ -174,7 +180,7 @@ hyper_mus_0, hyper_sigmas_0 = sample_posterior(n_points, mu0_init, sigma0_init, 
 
 
 
-plt.hist(hyper_mus_0,50, alpha=0.5, density=True, label=r'$\delta\hat\phi_0$')
+plt.hist(hyper_mus_0,20, alpha=0.5, density=True, label=r'$\delta\hat\phi_0$')
 #plt.hist(hyper_mus_1,50, alpha=0.5, density=True, label=r'$\delta\hat\phi_1$')
 #plt.hist(hyper_mus_2,50, alpha=0.5, density=True, label=r'$\delta\hat\phi_2$')
 plt.xlim(-0.3, 0.3)

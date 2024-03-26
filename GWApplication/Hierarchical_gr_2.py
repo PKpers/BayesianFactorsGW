@@ -162,6 +162,29 @@ exit()
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 for i in range():
     mu_new= rand.normal(mu_acc, 1)
     s_new= rand.normal(s_acc, 0.01)
