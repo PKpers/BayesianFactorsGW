@@ -1,133 +1,101 @@
-## Issues for discussion :
-# 2. the proportionality constant of measurement error
-# 3. region of integration
 from numpy import random as rand
 from matplotlib import pyplot as plt
 from scipy.integrate import quad
 import numpy as np
+import multiprocessing as mp
+from itertools import repeat
+
+from hgrlib import *
+
 pi = np.pi
-
-def init_plotting():
-    
-    plt.rcParams['figure.max_open_warning'] = 0
-    
-    plt.rcParams['mathtext.fontset']  = 'stix'
-    plt.rcParams['font.family']       = 'STIXGeneral'
-
-    plt.rcParams['font.size']         = 10
-    plt.rcParams['axes.linewidth']    = 1
-    plt.rcParams['axes.labelsize']    = plt.rcParams['font.size']
-    plt.rcParams['axes.titlesize']    = 1.5*plt.rcParams['font.size']
-    plt.rcParams['legend.fontsize']   = plt.rcParams['font.size']
-    plt.rcParams['xtick.labelsize']   = plt.rcParams['font.size']
-    plt.rcParams['ytick.labelsize']   = plt.rcParams['font.size']
-    plt.rcParams['xtick.major.size']  = 3
-    plt.rcParams['xtick.minor.size']  = 3
-    plt.rcParams['xtick.major.width'] = 1
-    plt.rcParams['xtick.minor.width'] = 1
-    plt.rcParams['ytick.major.size']  = 3
-    plt.rcParams['ytick.minor.size']  = 3
-    plt.rcParams['ytick.major.width'] = 1
-    plt.rcParams['ytick.minor.width'] = 1
-    
-    plt.rcParams['legend.frameon']             = False
-    plt.rcParams['legend.loc']                 = 'center left'
-    plt.rcParams['contour.negative_linestyle'] = 'solid'
-    
-    plt.gca().spines['right'].set_color('none')
-    plt.gca().spines['top'].set_color('none')
-    plt.gca().xaxis.set_ticks_position('bottom')
-    plt.gca().yaxis.set_ticks_position('left')
-    
-    return
-
-def SNR(x):
-    '''
-    the Signal to Noise ratio
-    probability disribution
-    '''
-    return 1/x**4
-
-def inverse_cdf_SNR(x):
-    return -(1/(3*x))**(1/3)
-
-def gaussian(p, mu, sigma):
-    expo = -0.5*( (p - mu)/sigma )**2
-    norm = 1/np.sqrt(2*pi*sigma**2)
-    return norm*np.exp(expo)
 
 init_plotting()
 
-n_data = 100
-def sample_snr(n_data):
-    sampled_SNR = []
-    while len(sampled_SNR) != n_data:
-        u = rand.uniform(0,1)
-        snr = abs( inverse_cdf_SNR(u))
-        if snr>=12:
-            sampled_SNR.append(snr)
-        #
-    return sampled_SNR
+#####################Data simulation inputs####################################################
+n_data                          = 100               # Number of data to simulate
+plot_snr, plot_sigmas, plot_mus = False, False, False # Plot snr, measurement error, delta phis   
+###############################################################################################
+
+
+#####################Posterior sampling inputs###############################################
+n_points              = 1000  # number of posterior samples
+mu0_init, sigma0_init = 0, 1
+# Initial hyper mu and hyper sigma for the phi0 hyper parameter 
+mu0_jump, sigma0_jump = 1, 0.2
+#############################################################################################
+
+populations = 200
+
+@jit(nopython=True)
+def generate_dataset(n_data, var_idx):
+    '''
+    n_data (int) : The number of measurements to generate
+    var_idx (int): The index number for the parameter generating measurements
+    '''
+
+    # Sample the snr
+    sampled_SNR = sample_snr(n_data)
+
+    # SNR proportionality constants
+    if var_idx==0:
+        prop = np.array( [24*0.06 for num in range(n_data)] )
+
+    elif var_idx==1:
+        prop = np.array( [24*0.3 for num in range(n_data)] )
     
+    elif var_idx==2:
+        prop = np.array( [24*0.2  for num in range(n_data)] )
 
-sampled_SNR = np.array( [  sample_snr(n_data) for times in range(3) ] ) # Generate SNRs for the 3 datasets
-plt.title('Sampled SNR')
-plt.hist(sampled_SNR[0],alpha=0.5, label='SNR0')
-plt.hist(sampled_SNR[1],alpha=0.5, label='SNR1')
-plt.hist(sampled_SNR[2],alpha=0.5, label='SNR2')
-plt.xlabel('SNR')
-plt.legend(loc='best')
+    # calculate the measurement errors of the parameter
+    measurement_error = (1/sampled_SNR)*prop / 2
 
-# SNR proportionality constants 
-prop_0 = np.array( [24*0.06 for num in range(n_data)] )
-prop_1 = np.array( [24*0.3  for num in range(n_data)] )
-prop_2 = np.array( [24*0.2  for num in range(n_data)] )
+    #calculate the paramter
+    deltaPhi = np.array(
+        [rand.normal(0., abs(m_e)) for m_e in measurement_error]
+    )   
 
-measurement_error_0 = (1/sampled_SNR[0])*prop_0
-measurement_error_1 = (1/sampled_SNR[1])*prop_1
-measurement_error_2 = (1/sampled_SNR[2])*prop_2
+    return deltaPhi, measurement_error
 
-plt.figure()
-plt.title(r'Sampled $\sigma$')
-plt.hist(measurement_error_0,alpha=0.5, label=r'$\mu$0')
-plt.hist(measurement_error_1,alpha=0.5, label=r'$\mu$1')
-plt.hist(measurement_error_2,alpha=0.5, label=r'$\mu$2')
-plt.xlabel(r'$\mu$')
-plt.legend(loc='best')
+#deltaPhi_0, measurement_error_0 = generate_dataset(n_data, 0)
+#deltaPhi_1, measurement_error_1 = generate_dataset(n_data, 1)
+#deltaPhi_2, measurement_error_2 = generate_dataset(n_data, 2)
 
-deltaPhi_0 = np.array(
-    [rand.normal(0, abs(measurement_error_0[i])) for i in range(n_data)]
-)
+## Make plots if want to
+if plot_snr:
+    plt.title('Sampled SNR')
+    #plt.plot(x_range, 1/(x_range**4 - 12**4), label=r'$\propto\frac{1}{x^4}$')
+    plt.hist(sampled_SNR[0],alpha=0.5, label='SNR0')
+    plt.hist(sampled_SNR[1],alpha=0.5, label='SNR1')
+    plt.hist(sampled_SNR[2],alpha=0.5, label='SNR2')
+    plt.xlabel('SNR')
+    plt.legend(loc='best')
 
-deltaPhi_1 = np.array(
-    [rand.normal(0., abs(m_e)) for m_e in measurement_error_1]
-)
-deltaPhi_2 = np.array(
-    [rand.normal(0., abs(m_e)) for m_e in measurement_error_2]
-)
+if plot_sigmas:
+    plt.figure()
+    plt.title(r'Sampled $\sigma$')
+    plt.hist(measurement_error_0, alpha=0.5, label=r'$\sigma$0')
+    plt.hist(measurement_error_1, alpha=0.5, label=r'$\sigma$1')
+    plt.hist(measurement_error_2, alpha=0.5, label=r'$\sigma$2')
+    plt.xlabel(r'$\sigma$')
+    plt.legend(loc='best')
 
-plt.figure()
-plt.title(r'Sampled $\mu$')
-plt.hist(deltaPhi_0,alpha=0.5, label=r'$\sigma$0')
-plt.hist(deltaPhi_1,alpha=0.5, label=r'$\sigma$1')
-plt.hist(deltaPhi_2,alpha=0.5, label=r'$\sigma$2')
-plt.xlabel(r'$\sigma$')
+if plot_mus:
+    plt.figure()
+    plt.title(r'Sampled $\mu$')
+    plt.hist(deltaPhi_0,alpha=0.5, label=r'$\mu$0')
+    plt.hist(deltaPhi_1,alpha=0.5, label=r'$\mu$1')
+    plt.hist(deltaPhi_2,alpha=0.5, label=r'$\mu$2')
+    plt.xlabel(r'$\mu$')
 
-plt.legend(loc='best')
-plt.show()
+if any([plot_mus, plot_sigmas, plot_snr]):
+    plt.legend(loc='best')
+    plt.show()
 
-def integral(mu_j, sigma_j, measured_param, measurement_error, n_data, prior_mu, prior_s):
-    integrals = [
-        quad( lambda p_i: gaussian(p_i, measured_param[i], measurement_error[i])*gaussian(p_i, mu_j, sigma_j),
-              measured_param[i]-3*measurement_error[i], measured_param[i]+3*measurement_error[i])[0]
-        for i in range(n_data) # the limit of integration is 3sigma around each p_i
-    ]
-    result = 1
-    for integral in integrals:
-        result *= integral
-        
-    return prior_mu*prior_s*result
+    #make a new frame for other plots
+    plt.figure()
 
+#
+## Sample the posterior
 prior_mu_0 = 1/0.1 # the hyper prior on the hyper mu as taken from the graph
 prior_s_0 = 1/0.09 # the hyper prior on the hyper sigma as taken from the graph
 
@@ -138,52 +106,65 @@ prior_mu_2 = 1/0.1 # the hyper prior on the hyper mu as taken from the graph
 prior_s_2 = 1/0.09 # the hyper prior on the hyper sigma as taken from the graph
 
 
-def sample_posterior(n_points, mu_init, s_init, delta_phi, measurement_error, prior_mu, prior_s, num_data=n_data):
-    '''
-    Generate MCMC samples from the posterior 
-    n_points: the number of points to sample
-    mu_init: initial mu
-    s_init: initial sigma
-    delta_phi: list of the simulated measurements for delta phis
-    measurement_error: list of the simulated uncertainties for the corresponding delta phi
-    prior_mu: the prior on the mu
-    prior_s: the prior on the sigma
-    '''
-    hyper_mus, hyper_sigmas = list(), list()
-    n_samples= 1
-    mu_acc, s_acc = mu_init, s_init
-    for i in range(1000):
-        mu_new= rand.normal(mu_acc, 1)
-        s_new= rand.normal(s_acc, 0.01)
-        p = integral(mu_new,s_new, delta_phi, measurement_error, num_data, prior_mu, prior_s)\
-            /integral(mu_acc, s_acc, delta_phi, measurement_error, num_data, prior_mu, prior_s) 
-        #
-        T = min(1, p)
-        u = rand.random_sample()
-        if u <= T:
-            mu_acc, s_acc = mu_new, s_new
-            n_samples += 1
-        #
-        hyper_mus.append(mu_acc)
-        hyper_sigmas.append(s_acc)
-        print('Acceptance: {perc} ({samples_N}/{tot_N})'.format(perc=(n_samples/(i+1)), samples_N=n_samples, tot_N=i+1))
-    return (hyper_mus, hyper_sigmas) 
-    #
+bests_hmu_0, bests_hsig_0, lows_hmu_0, lows_hsig_0, highs_hmu_0, highs_hsig_0 = [list() for i in range(6)]
+sample_size = np.arange(10, n_data, 2)
+
+for num in sample_size:
+    best_hmu_0_dump, best_hsig_0_dump, lower_hmu_0_dump, lower_hsig_0_dump,  higher_hmu_0_dump, higher_hsig_0_dump = [list() for i in range(6)]
+    for population in range(populations):
+        
+        deltaPhi_0, measurement_error_0 = generate_dataset(num, 0)
+    
+        hyper_mus_0,  hyper_sigmas_0 = sample_posterior(n_points, mu0_init, sigma0_init, mu0_jump, sigma0_jump, deltaPhi_0, measurement_error_0, prior_mu_0, prior_s_0, num)
+        best_hmu_0,   best_hsig_0    = np.median(hyper_mus_0), np.median(hyper_sigmas_0)
+        lower_hmu_0,  lower_hsig_0   = np.percentile(hyper_mus_0, 5), np.percentile(hyper_sigmas_0, 5)
+        higher_hmu_0, higher_hsig_0  = np.percentile(hyper_mus_0, 95), np.percentile(hyper_sigmas_0, 95)
+
+        best_hmu_0_dump.append(best_hmu_0)
+        best_hsig_0_dump.append(best_hsig_0)
+
+        lower_hmu_0_dump.append(lower_hmu_0)
+        lower_hsig_0_dump.append(lower_hsig_0)
+
+        higher_hmu_0_dump.append(higher_hmu_0)
+        higher_hsig_0_dump.append(higher_hsig_0)
+
+
+    bests_hmu_0.append(np.mean(best_hmu_0_dump ))
+    bests_hsig_0.append(np.mean( best_hsig_0_dump ))
+    lows_hmu_0.append(np.mean(lower_hmu_0_dump))
+    lows_hsig_0.append(np.mean(lower_hsig_0_dump))
+    highs_hmu_0.append(np.mean(higher_hmu_0_dump))
+    highs_hsig_0.append(np.mean(higher_hsig_0_dump))
+
 #
-n_points = 5000
-mu0_init, sigma0_init = 0, 1
 
-hyper_mus_0, hyper_sigmas_0 = sample_posterior(n_points, mu0_init, sigma0_init, deltaPhi_0, measurement_error_0, prior_mu_0, prior_s_0)
-#hyper_mus_1, hyper_sigmas_1 = sample_posterior(n_points, mu1_init, sigma1_init, deltaPhi_1, measurement_error_1, prior_mu_1, prior_s_1)
-#hyper_mus_0, hyper_sigmas_2 = sample_posterior(n_points, mu2_init, sigma2_init, deltaPhi_2, measurement_error_2, prior_mu_2, prior_s_2)
+# export the results to a csv file for plotting
+import csv
+rows = zip(bests_hmu_0, bests_hsig_0, lows_hmu_0, lows_hsig_0, highs_hmu_0, highs_hsig_0)
 
+with open('output.csv', 'w', newline='') as csvfile:
+    # Create a CSV writer object
+    csvwriter = csv.writer(csvfile)
+    
+    # Write the header row
+    csvwriter.writerow(['bests_hmu_0', 'bests_hsig_0', 'lows_hmu_0', 'lows_hsig_0', 'highs_hmu_0', 'highs_hsig_0'])
+    
+    # Write the data rows
+    csvwriter.writerows(rows)
 
+exit()
+#plt.plot(sample_size, bests_hmu_0, 'g--')
+#plt.fill_between(sample_size, lows_hmu_0, highs_hmu_0, alpha=0.5)
+#plt.show()
 
+#hyper_mus_1, hyper_sigmas_1 = sample_posterior(n_points, mu1_init, sigma1_init, deltaPhi_1, measurement_error_1, prior_mu_1, prior_s_1, n_data)
+#hyper_mus_0, hyper_sigmas_2 = sample_posterior(n_points, mu2_init, sigma2_init, deltaPhi_2, measurement_error_2, prior_mu_2, prior_s_2, n_data)
 
 plt.hist(hyper_mus_0,20, alpha=0.5, density=True, label=r'$\delta\hat\phi_0$')
 #plt.hist(hyper_mus_1,50, alpha=0.5, density=True, label=r'$\delta\hat\phi_1$')
 #plt.hist(hyper_mus_2,50, alpha=0.5, density=True, label=r'$\delta\hat\phi_2$')
-plt.xlim(-0.3, 0.3)
+#plt.xlim(-0.3, 0.3)
 plt.xlabel(r'$\mu$')
 plt.ylabel(r'$\int d\sigma P(\mu, \sigma|D)$')
 plt.legend(loc='best')
