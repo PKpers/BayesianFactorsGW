@@ -96,14 +96,14 @@ if any([plot_mus, plot_sigmas, plot_snr]):
 
 #
 ## Sample the posterior
-prior_mu_0 = 1/0.1 # the hyper prior on the hyper mu as taken from the graph
-prior_s_0 = 1/0.09 # the hyper prior on the hyper sigma as taken from the graph
+prior_mu_0 = 1/0.5 # the hyper prior on the hyper mu as taken from the graph
+prior_s_0 = 1/0.2 # the hyper prior on the hyper sigma as taken from the graph
 
-prior_mu_1 = 1/0.1 # the hyper prior on the hyper mu as taken from the graph
-prior_s_1 = 1/0.09 # the hyper prior on the hyper sigma as taken from the graph
+prior_mu_1 = 1/0.5 # the hyper prior on the hyper mu as taken from the graph
+prior_s_1 = 1/0.2 # the hyper prior on the hyper sigma as taken from the graph
 
-prior_mu_2 = 1/0.1 # the hyper prior on the hyper mu as taken from the graph
-prior_s_2 = 1/0.09 # the hyper prior on the hyper sigma as taken from the graph
+prior_mu_2 = 1/0.5 # the hyper prior on the hyper mu as taken from the graph
+prior_s_2 = 1/0.2 # the hyper prior on the hyper sigma as taken from the graph
 
 
 bests_hmu_0, bests_hsig_0, lows_hmu_0, lows_hsig_0, highs_hmu_0, highs_hsig_0 = [list() for i in range(6)]

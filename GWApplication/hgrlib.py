@@ -53,8 +53,8 @@ def posterior(mu_j, sigma_j, measured_param, measurement_error, n_data, prior_mu
 
     integrals = np.zeros(n_data)
     for i in prange(n_data):
-        a = measured_param[i] - 3 * measurement_error[i]
-        b = measured_param[i] + 3 * measurement_error[i]
+        a = measured_param[i] - 4 * measurement_error[i]
+        b = measured_param[i] + 4 * measurement_error[i]
         n = 1000  # number of intervals, must be even
         h = (b - a) / n
         x = np.linspace(a, b, n+1)
@@ -70,7 +70,7 @@ def posterior(mu_j, sigma_j, measured_param, measurement_error, n_data, prior_mu
 
         integrals[i] = integral
     result = np.prod(integrals)
-    return result*prior_s*prior_mu
+    return result
 
 
 

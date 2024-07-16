@@ -154,7 +154,7 @@ for num_d in n_datasets:
     ]
 
     NoGR_same  = [
-        np.ones(num_d) + random.normal(mu, sigma, num_d) # GR is wrong. Same BGR param + noise                 
+        np.ones(num_d)*0.1 + random.normal(mu, sigma, num_d) # GR is wrong. Same BGR param + noise                 
         for _ in range(num_sim)
     ]
 
@@ -222,7 +222,7 @@ plt.legend()
 
 
 plt.figure()
-plt.plot(N,  np.power( ( 5*np.sqrt(1/(2*pi)) ), N ),
+plt.plot(N,  np.power( ( 4*np.sqrt(1/(2*pi)) ), N ),
          color='black', linestyle='--', label=r'~$x^N$ (GR analytic)'
 )
 
@@ -231,12 +231,12 @@ plt.plot(N,  np.power( ( 0.5*np.sqrt(1/(2*pi)) ), N )*np.exp(-N/2),
 )
 
 plt.scatter(n_datasets, BF_GR_diff,   color='green', s = 10,   label = 'GR + noise')
-plt.scatter(n_datasets, BF_NGRS_diff, color='purple', s = 10, label = r'Non-GR + noise, $\mu=1$ ')
-plt.scatter(n_datasets, BF_NGRD2_diff, color='pink',   s = 10, label = r'Non-GR + noise, $\mu\in[-4,4]$ ')
+plt.scatter(n_datasets, BF_NGRS_diff, color='pink', s = 10, label = r'Non-GR + noise, $\mu=0.1$ ')
+plt.scatter(n_datasets, BF_NGRD2_diff, color='purple',   s = 10, label = r'Non-GR + noise, $\mu\in[-4,4]$ ')
 plt.xlabel('Number of datasets')
 plt.ylabel('Bayes Factor')
 plt.yscale('log')
-#plt.ylim(pow(10,-70), pow(10, 80))
+plt.ylim(1e-100, 1e80)
 plt.xlim(0, 250)
 plt.legend()
 
